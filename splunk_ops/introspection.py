@@ -17,9 +17,9 @@ def get_server_info(base_url, token):
     response = requests.get(
         endpoint, headers=headers, data=data, verify=False)
 
-    return response.text
+    return response.json()
 
 
 def get_splunk_version(base_url, token):
-    server_info = json.loads(get_server_info(base_url, token))
-    return server_info["entry"][0]["content"]["version"]
+    splunk_info = get_server_info(base_url, token)
+    return splunk_info["entry"][0]["content"]["version"]
