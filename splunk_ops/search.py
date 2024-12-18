@@ -1,5 +1,6 @@
 import requests
-# import json
+import json
+import time
 import urllib3
 
 
@@ -30,14 +31,15 @@ def get_search_jobs(base_url, token, output_mode="json", **kwargs):
     """Get details of all current searches."""
     endpoint = f"{base_url}{SEARCH_JOBS}"
     headers = {"Authorization": f"Bearer {token}"}
-    data = {
+    params = {
         "output_mode": output_mode
     }
 
     if kwargs:
-        data.update(kwargs)
+        params.update(kwargs)
 
-    response = requests.get(endpoint, headers=headers, data=data, verify=False)
+    response = requests.get(endpoint, headers=headers,
+                            params=params, verify=False)
 
     if response.status_code == 200:
         return response.text
@@ -77,14 +79,15 @@ def get_search_jobs_sid(base_url, token, sid, output_mode="json", **kwargs):
     """Manage the {search_id} search job."""
     endpoint = f"{base_url}{SEARCH_JOBS_SID.format(search_id=sid)}"
     headers = {"Authorization": f"Bearer {token}"}
-    data = {
+    params = {
         "output_mode": output_mode
     }
 
     if kwargs:
-        data.update(kwargs)
+        params.update(kwargs)
 
-    response = requests.get(endpoint, headers=headers, data=data, verify=False)
+    response = requests.get(endpoint, headers=headers,
+                            params=params, verify=False)
 
     if response.status_code == 200:
         results = response.json()
@@ -94,3 +97,55 @@ def get_search_jobs_sid(base_url, token, sid, output_mode="json", **kwargs):
             f"Code: {response.status_code}"
             f"Response: {response.text}"
         )
+
+
+def get_search_results(base_url, token, sid, **kwargs):
+    """Fetch search results per 1000 results"""
+    endpoint = f"{base_url}{SEARCH_JOBS_SID_RESULTS.format(search_id=sid)}"
+    page_count = 1000
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "output_mode": "json",
+        "count": page_count,
+        "offset": 0,
+    }
+
+    if kwargs:
+        params.update(kwargs)
+
+    all_results = []
+    while True:
+        response = requests.get(
+            endpoint, headers=headers, params=params, verify=False
+        )
+
+        if response.status_code == 204:
+            # No result yet; wait for the job to complete
+            time.sleep(5)
+            continue
+
+        if response.status_code not in (200, 201):
+            raise Exception(f"Failed to fetch results: {response.text}")
+
+        # Parse the response
+        response_json = response.json()
+
+        results = response_json.get("results", [])
+        if not results:
+            if all_results:
+                print("All results are fetched.")
+                break
+            else:
+                print("No more results available")
+                # Break when no more results are returned
+                break
+
+        all_results.extend(results)
+        print(f"Fetched {len(results)} results (Total: {len(all_results)})")
+
+        if len(results) < page_count:
+            print("Fetched final result.")
+            break
+        params["offset"] += page_count  # get another page
+
+    return all_results

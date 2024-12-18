@@ -1,9 +1,16 @@
+import logging
 import urllib3
 import argparse
 import os
-import time
+# import time
 import json
-from gabutils.gabutils import load_config
+from gabutils.gabutils import (
+    setup_logging,
+    load_config,
+    generate_weekly_ranges,
+    parse_version,
+    write_to_json_file)
+from gabutils import gabutargs as gargs
 from splunk_ops import introspection, search
 
 
@@ -14,100 +21,149 @@ CONFIG_FILE = "config.ini"
 
 def splunk_search(base_url, token, query, **kwargs):
     try:
-        if kwargs:
-            print("Starting search...")
-            sid = search.set_search_jobs(base_url, token, query, **kwargs)
-            print(f"Search job started with SID: {sid}")
+        print("Starting search...")
+        sid = search.set_search_jobs(base_url, token, query, **kwargs)
+        print(f"Search job started with SID: {sid}")
 
-        else:
-            print("Starting search...")
-            sid = search.set_search_jobs(base_url, token, query)
-            print(f"Search job started with SID: {sid}")
-
-        while True:
-            search_jobs_info = search.get_search_jobs_sid(
-                base_url, token, sid, **kwargs)
-            search_jobs_status = search_jobs_info["entry"][0]["content"]
-            if search_jobs_status["dispatchState"] == "DONE":
-                print("Search job completed")
-                return
-            print("waiting for job to complete")
-            time.sleep(5)
+        print("Fetching results...")
+        results = search.get_search_results(base_url, token, sid, **kwargs)
+        return results
     except Exception as e:
         print(e)
-        return e
+        return []
+
+
+def find_first_notable_time(base_url, token):
+    query = "| tstats earliest(_time) AS _time WHERE index=notable"
+    results = splunk_search(base_url, token, query, earliest_time="",
+                            latest_time="now")
+    return results
+
+
+def get_unclosed_notable_event(base_url, token,
+                               earliest_time="", latest_time="now",
+                               output_dir="unclosed-notables"):
+    """Get all un-closed notable events since the {earliest_time}
+    till the {latest_time}
+
+    Arguments:
+    base_url -- Splunk instance base URL
+    token -- Splunk access token
+
+    Keyword arguments:
+    earliest_time -- Search start time. Default: First indexed notable event.
+    latest_time -- Search end time, Default: now()
+    output_dir -- Output directory to write the output JSON file to, this will
+    rewrite if the directory exists.
+
+    Returns:
+    bool: True if the process completes successfully, False otherwise.
+    """
+    try:
+        # Determine earliest_time
+        if earliest_time:
+            start_date_input = earliest_time
+        else:
+            logging.info("Find the first indexed notable event time.")
+            first_notable = find_first_notable_time(base_url, token)
+            # If first notable exists
+            if first_notable:
+                start_date_input = first_notable[0]['_time']
+                logging.info(
+                    f"First indexed notable event time found:"
+                    f"{start_date_input}")
+            else:
+                logging.error("No earliest time found. Exiting.")
+                raise ValueError("Earliest time value is empty")
+
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        logging.info(f"Output directory is set to: {output_dir}")
+
+        # Generate weekly ranges
+        dates = generate_weekly_ranges(start_date_input, latest_time)
+        logging.info(f"Generated {len(dates)} weekly date ranges.")
+
+        query = """
+        search `notable`
+        | search (NOT `suppression` AND status!=5)
+        | table event_id"""
+
+        # Search all un-closed notable and write to file
+        for date in dates:
+            # Get notable event_id
+            earliest = date["start"]
+            latest = date["end"]
+            output_file = os.path.join(output_dir,
+                                       f"{earliest[:10]}_{latest[:10]}.json")
+            try:
+                logging.info(
+                    f"Fetching notable events from {earliest} to {latest}.")
+                notable_events = splunk_search(
+                    base_url, token, query,
+                    earliest_time=earliest, latest_time=latest)
+
+                # Write results to json
+                if write_to_json_file(notable_events, output_file):
+                    logging.info(
+                        f"Result successfully saved to: {output_file}")
+                else:
+                    logging.warning(
+                        f"Failed to write results for range"
+                        f"{earliest} to {latest}.")
+            except Exception as e:
+                logging.error(
+                    f"Error processing range {earliest} to {latest}: {e}")
+        logging.info(f"All files saved to: {output_dir}")
+        return True
+    except Exception as e:
+        logging.critical(f"Failed to retrieve un-closed notable events: {e}")
+        return False
+
+
+def close_notable_event(base_url, token):
+    pass
 
 
 def main():
+    setup_logging(log_file="sekripgabut.log", log_level=logging.DEBUG)
     parser = argparse.ArgumentParser(
         description="Sekrip hasil kegabutan sehari-hari"
     )
 
-    # Global argument
-    parser.add_argument(
-        "--config",
-        help="Load config .ini file"
+    # Add global arguments
+    gargs.add_global_arguments(parser)
+
+    # Define command subparser
+    subparsers = parser.add_subparsers(dest="command", required=False)
+
+    # Define 'es' command
+    es_parser = subparsers.add_parser(
+        "es",
+        help="Collection of Splunk Enterprise Security operations"
     )
 
-    # Define main subparsers for primary commands
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    # Add 'es' arguments
+    gargs.add_es_arguments(es_parser)
 
-    # 'splunk' command
     splunk_parser = subparsers.add_parser(
         "splunk",
         help="Collection of splunk operations"
     )
+    # Add 'splunk' arguments
+    gargs.add_splunk_arguments(splunk_parser)
+
     splunk_subparsers = splunk_parser.add_subparsers(
-        dest="subcommand", required=True
+        dest="subcommand", required=False
     )
-
-    # 'splunk introspection' subcommand
-    introspection_parser = splunk_subparsers.add_parser(
-        "introspection",
-        help="Collection of splunk introspection endpoints operations"
-    )
-    introspection_parser.add_argument(
-        "--splunkinfo",
-        help="Return full info of splunk instance",
-        action="store_true"
-    )
-    introspection_parser.add_argument(
-        "--splunkversion",
-        help="Return splunk instance version",
-        action="store_true"
-    )
-
-    # 'splunk search' subcommand
+    # Define 'splunk search' subcommand
     search_parser = splunk_subparsers.add_parser(
         "search",
         help="Collection of splunk search endpoints operations"
     )
-    # 'splunk search' parameters
-    search_parser.add_argument(
-        "--get-search-jobs",
-        help="Split notables json file into chunks",
-        action="store_true"
-    )
 
-    search_parser.add_argument(
-        "--search",
-        help="Input your SPL query here"
-    )
-
-    search_parser.add_argument(
-        "--earliest",
-        help="earliest search time range. Default to -24h"
-    )
-
-    search_parser.add_argument(
-        "--latest",
-        help="Latest search time range. Default to now()"
-    )
-
-    search_parser.add_argument(
-        "--get-search-jobs-sid",
-        help="Get detail info about search job by search id"
-    )
+    # Add 'splunk search' arguments
+    gargs.add_search_arguments(search_parser)
 
     args = parser.parse_args()
 
@@ -120,15 +176,25 @@ def main():
     token = config.get('Auth', 'token')
     base_url = config.get('Splunk', 'base_url')
 
+    # Quick testing
+    if args.test:
+        testing = get_unclosed_notable_event(
+            base_url, token,
+            earliest_time="-15m",
+            latest_time="now",
+            output_dir="testing_dir")
+        if testing:
+            print("sukses")
+        else:
+            print("gagal coeg!")
+
     # Get full splunk instance info
-    if (args.command == "splunk" and args.subcommand == "introspection"
-            and args.splunkinfo):
+    if (args.command == "splunk" and args.info):
         splunk_info = introspection.get_server_info(base_url, token)
         print(json.dumps(splunk_info, indent=4))
 
     # Get splunk version
-    if (args.command == "splunk" and args.subcommand == "introspection"
-            and args.splunkversion):
+    if (args.command == "splunk" and args.version):
         splunk_version = introspection.get_splunk_version(base_url, token)
         print(splunk_version)
 
@@ -140,7 +206,7 @@ def main():
         except Exception as e:
             print(e)
 
-    # Start a splunk searhing and return the SID
+    # Do splunk search
     if (args.command == "splunk" and
             args.subcommand == "search" and args.search):
         query = args.search
