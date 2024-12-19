@@ -1,17 +1,17 @@
 import logging
 import urllib3
 import argparse
-import os
-import shutil
 # import time
 import json
-from gabutils.gabutils import (
+from utils.gabutils import (
     setup_logging,
     load_config,
-    generate_weekly_ranges,
-    parse_version,
-    write_to_json_file)
-from gabutils import gabutargs as gargs
+)
+from helpers import (
+    args_helper,
+    splunk_helpers,
+    es_helpers,
+)
 from splunk_ops import introspection, search
 from es_ops import es_api
 
@@ -21,130 +21,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 CONFIG_FILE = "config.ini"
 
 
-def splunk_search(base_url, token, query, **kwargs):
-    try:
-        print("Starting search...")
-        sid = search.set_search_jobs(base_url, token, query, **kwargs)
-        print(f"Search job started with SID: {sid}")
-
-        print("Fetching results...")
-        results = search.get_search_results(base_url, token, sid, **kwargs)
-        return results
-    except Exception as e:
-        print(e)
-        return None
-
-
-def find_first_notable_time(base_url, token):
-    query = "| tstats earliest(_time) AS _time WHERE index=notable"
-    try:
-        results = splunk_search(base_url, token, query, earliest_time="",
-                                latest_time="now")
-        return results
-    except Exception as e:
-        logging.error(f"Failed to retrieve the first notable index time: {e}")
-        return None
-
-
-def fetch_unclosed_notable_to_file(
-        base_url,
-        token,
-        earliest_time="",
-        latest_time="now",
-        output_dir="unclosed-notables"):
-    """Get all un-closed notable events since the {earliest_time}
-    till the {latest_time}
-
-    Arguments:
-    base_url -- Splunk instance base URL
-    token -- Splunk access token
-
-    Keyword arguments:
-    earliest_time -- Search start time. Default: First indexed notable event.
-    latest_time -- Search end time, Default: now()
-    output_dir -- Output directory to write the output JSON file to, this will
-    rewrite if the directory exists.
-
-    Returns:
-    bool: True if the process completes successfully, False otherwise.
-    """
-    try:
-        # Determine earliest_time
-        if earliest_time:
-            start_date_input = earliest_time
-        else:
-            logging.info("Find the first indexed notable event time.")
-            first_notable = find_first_notable_time(base_url, token)
-            # If first notable exists
-            if first_notable:
-                start_date_input = first_notable[0]['_time']
-                logging.info(
-                    f"First indexed notable event time found:"
-                    f"{start_date_input}")
-            else:
-                logging.error("No earliest time found. Exiting.")
-                raise ValueError("Earliest time value is empty")
-
-        # Ensure output directory exists
-        if os.path.exists(output_dir):
-            logging.info(f"{output_dir} exists. Overwrite.")
-            shutil.rmtree(output_dir)
-        os.makedirs(output_dir, exist_ok=True)
-        logging.info(f"Output directory is set to: {output_dir}")
-
-        # Generate weekly ranges
-        dates = generate_weekly_ranges(start_date_input, latest_time)
-        logging.info(f"Generated {len(dates)} weekly date ranges.")
-
-        query = """
-        search `notable`
-        | search (NOT `suppression` AND status!=5)
-        | table event_id"""
-
-        # Search all un-closed notable and write to file
-        for date in dates:
-            # Get notable event_id
-            earliest = date["start"]
-            latest = date["end"]
-            output_file = os.path.join(output_dir,
-                                       f"{earliest[:10]}_{latest[:10]}.json")
-            try:
-                logging.info(
-                    f"Fetching notable events from {earliest} to {latest}.")
-                notable_events = splunk_search(
-                    base_url, token, query,
-                    earliest_time=earliest, latest_time=latest)
-
-                # Write results to json
-                if write_to_json_file(notable_events, output_file):
-                    logging.info(
-                        f"Result successfully saved to: {output_file}")
-                else:
-                    logging.warning(
-                        f"Failed to write results for range"
-                        f"{earliest} to {latest}.")
-            except Exception as e:
-                logging.error(
-                    f"Error processing range {earliest} to {latest}: {e}")
-        logging.info(f"All files saved to: {output_dir}")
-        return True
-    except Exception as e:
-        logging.critical(f"Failed to retrieve un-closed notable events: {e}")
-        return False
-
-
-def close_notable_event_by_event_id(base_url, token, event_id, **kwargs):
-    results = es_api.update_notable_event(base_url, token, status=5,
-                                          ruleUIDs=event_id, **kwargs)
-    return results
-
-
-def close_notable_event_by_sid(base_url, token, sid, **kwargs):
-    results = es_api.update_notable_event(base_url, token, status=5,
-                                          searchID=sid, **kwargs)
-    return results
-
-
 def main():
     setup_logging(log_file="sekripgabut.log", log_level=logging.DEBUG)
     parser = argparse.ArgumentParser(
@@ -152,7 +28,7 @@ def main():
     )
 
     # Add global arguments
-    gargs.add_global_arguments(parser)
+    args_helper.add_global_arguments(parser)
 
 # Define command subparser
     subparsers = parser.add_subparsers(dest="command", required=False)
@@ -164,14 +40,14 @@ def main():
     )
 
     # Add 'es' arguments
-    gargs.add_es_arguments(es_parser)
+    args_helper.add_es_arguments(es_parser)
 
     splunk_parser = subparsers.add_parser(
         "splunk",
         help="Collection of splunk operations"
     )
     # Add 'splunk' arguments
-    gargs.add_splunk_arguments(splunk_parser)
+    args_helper.add_splunk_arguments(splunk_parser)
 
     splunk_subparsers = splunk_parser.add_subparsers(
         dest="subcommand", required=False
@@ -183,7 +59,7 @@ def main():
     )
 
     # Add 'splunk search' arguments
-    gargs.add_search_arguments(search_parser)
+    args_helper.add_search_arguments(search_parser)
 
     args = parser.parse_args()
 
@@ -215,7 +91,7 @@ def main():
         event_id = [item['event_id'] for item in event_ids]
         print(event_id)
         try:
-            event = close_notable_event_by_sid(
+            event = es_helpers.close_notable_event_by_sid(
                 base_url, token, sid)
             logging.info(f"event: {event}")
         except Exception as e:
@@ -253,7 +129,7 @@ def main():
             search_kwargs['latest_time'] = args.latest
 
         try:
-            print(splunk_search(
+            print(splunk_helpers.splunk_search(
                 base_url, token, query, **search_kwargs))
         except Exception as e:
             print(e)
