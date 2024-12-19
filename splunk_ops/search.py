@@ -2,6 +2,7 @@ import requests
 import json
 import time
 import urllib3
+import logging
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -52,27 +53,46 @@ def get_search_jobs(base_url, token, output_mode="json", **kwargs):
 def set_search_jobs(base_url, token, query,
                     earliest_time="-24h", latest_time="now",
                     output_mode="json", **kwargs):
-    """Start a new search and return the search ID (<sid>)"""
+    """Start a new search and return the search ID (<sid>)
+       Args:
+            base_url (str): Base URL of the Splunk instance.
+            token (str): Bearer token for authentication.
+            query (str): The search query.
+            earliest_time (str, optional): Earliest time for the search.
+            latest_time (str, optional): Latest time for the search.
+            output_mode (str, optional): Output format. Default is "json".
+            **kwargs: Additional parameters for the search.
+        Returns:
+        str: The search ID (sid) if the request is successful.
+
+    Raises:
+        Exception: If the request fails, logs the error and raises an
+        exception.
+    """
     endpoint = f"{base_url}{SEARCH_JOBS}"
     headers = {"Authorization": f"Bearer {token}"}
     data = {
         "search": query,
         "earliest_time": earliest_time,
         "latest_time": latest_time,
-        "output_mode": output_mode
+        "output_mode": output_mode,
+        **kwargs
     }
 
-    if kwargs:
-        data.update(kwargs)
+    response = None
 
-    response = requests.post(endpoint, headers=headers,
-                             data=data, verify=False)
-    if response.status_code == 201:
-        return response.json()["sid"]
-    else:
-        raise Exception(
-            f"Code: {response.status_code},"
-            f"Response: {response.text}")
+    try:
+        response = requests.post(endpoint, headers=headers,
+                                 data=data, verify=False)
+        response.raise_for_status()
+        return response.json().get("sid")
+    except requests.exceptions.RequestException as e:
+        if response:
+            logging.error(
+                f"Response status: {response.status_code}"
+                f"Response text {response.text}")
+        logging.error(f"Request failed: {e}")
+        raise
 
 
 def get_search_jobs_sid(base_url, token, sid, output_mode="json", **kwargs):

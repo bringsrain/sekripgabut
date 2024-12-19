@@ -10,9 +10,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 NOTABLE_UPDATE = "/services/notable_update"
 
 
-def update_notable_event(base_url, token, ruleUIDs=[], searchID="",
-                         newOwner="", urgency="", status="",
-                         disposition="", comment=""):
+def update_notable_event(base_url, token, status=None, ruleUIDs=[],
+                         searchID=None, newOwner="", urgency="",
+                         disposition=None, comment=""):
     """Update the status, urgency, owner, or comment of one or more findings.
 
     Arguments:
@@ -42,14 +42,16 @@ def update_notable_event(base_url, token, ruleUIDs=[], searchID="",
     endpoint = f"{base_url}{NOTABLE_UPDATE}"
     headers = {"Authorization": f"Bearer {token}"}
     data = {
-        "ruleUIDs": ruleUIDs,
-        "searchID": searchID,
         "newOwner": newOwner,
         "urgency": urgency,
         "status": status,
         "disposition": disposition,
         "comment": comment,
     }
+    if searchID:
+        data.update({'searchID': searchID})
+    if ruleUIDs:
+        data.update({"ruleUIDs": ruleUIDs})
 
     try:
         logging.info("Start to update events")

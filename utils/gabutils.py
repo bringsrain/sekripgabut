@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import re
 import json
 import logging
+import os
 
 
 def setup_logging(log_file="app.log", log_level=logging.INFO):
@@ -27,9 +28,34 @@ def setup_logging(log_file="app.log", log_level=logging.INFO):
     )
 
 
-def load_config(config_file):
+def load_config(config_file, required_sections=None):
     config = configparser.ConfigParser()
     config.read(config_file)
+
+    # Check if config file exists
+    if not os.path.exists(config_file):
+        logging.error(f"Config file not found: {config_file}")
+        raise FileNotFoundError(f"Config file not found: {config_file}")
+
+    # Read the configuration file
+    try:
+        config.read(config_file)
+        logging.info(f"Loaded config from {config_file}")
+    except configparser.Error as e:
+        logging.error(f"Failed to read config file: {e}")
+        raise
+
+    # Validate required sections and options
+    if required_sections:
+        for section, options in required_sections.items():
+            if not config.has_section(section):
+                logging.error(f"Missing section: {section}")
+                raise configparser.NoSectionError(section)
+            for option in options:
+                if not config.has_option(section, option):
+                    logging.error(
+                        f"Missing option '{option}' in section '{section}'")
+                    raise configparser.NoOptionError(section, option)
     return config
 
 

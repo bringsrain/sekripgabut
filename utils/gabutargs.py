@@ -21,6 +21,10 @@ def add_es_arguments(parser):
         help="Update notable event"
     )
     parser.add_argument(
+        "--close-notable",
+        help="Close notable event by event_id or sid",
+    )
+    parser.add_argument(
         "--earliest",
         help="Start time to search"
     )

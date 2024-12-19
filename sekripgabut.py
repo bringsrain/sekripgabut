@@ -2,6 +2,7 @@ import logging
 import urllib3
 import argparse
 import os
+import shutil
 # import time
 import json
 from gabutils.gabutils import (
@@ -12,6 +13,7 @@ from gabutils.gabutils import (
     write_to_json_file)
 from gabutils import gabutargs as gargs
 from splunk_ops import introspection, search
+from es_ops import es_api
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -30,19 +32,26 @@ def splunk_search(base_url, token, query, **kwargs):
         return results
     except Exception as e:
         print(e)
-        return []
+        return None
 
 
 def find_first_notable_time(base_url, token):
     query = "| tstats earliest(_time) AS _time WHERE index=notable"
-    results = splunk_search(base_url, token, query, earliest_time="",
-                            latest_time="now")
-    return results
+    try:
+        results = splunk_search(base_url, token, query, earliest_time="",
+                                latest_time="now")
+        return results
+    except Exception as e:
+        logging.error(f"Failed to retrieve the first notable index time: {e}")
+        return None
 
 
-def get_unclosed_notable_event(base_url, token,
-                               earliest_time="", latest_time="now",
-                               output_dir="unclosed-notables"):
+def fetch_unclosed_notable_to_file(
+        base_url,
+        token,
+        earliest_time="",
+        latest_time="now",
+        output_dir="unclosed-notables"):
     """Get all un-closed notable events since the {earliest_time}
     till the {latest_time}
 
@@ -77,6 +86,9 @@ def get_unclosed_notable_event(base_url, token,
                 raise ValueError("Earliest time value is empty")
 
         # Ensure output directory exists
+        if os.path.exists(output_dir):
+            logging.info(f"{output_dir} exists. Overwrite.")
+            shutil.rmtree(output_dir)
         os.makedirs(output_dir, exist_ok=True)
         logging.info(f"Output directory is set to: {output_dir}")
 
@@ -121,8 +133,16 @@ def get_unclosed_notable_event(base_url, token,
         return False
 
 
-def close_notable_event(base_url, token):
-    pass
+def close_notable_event_by_event_id(base_url, token, event_id, **kwargs):
+    results = es_api.update_notable_event(base_url, token, status=5,
+                                          ruleUIDs=event_id, **kwargs)
+    return results
+
+
+def close_notable_event_by_sid(base_url, token, sid, **kwargs):
+    results = es_api.update_notable_event(base_url, token, status=5,
+                                          searchID=sid, **kwargs)
+    return results
 
 
 def main():
@@ -134,7 +154,7 @@ def main():
     # Add global arguments
     gargs.add_global_arguments(parser)
 
-    # Define command subparser
+# Define command subparser
     subparsers = parser.add_subparsers(dest="command", required=False)
 
     # Define 'es' command
@@ -178,15 +198,28 @@ def main():
 
     # Quick testing
     if args.test:
-        testing = get_unclosed_notable_event(
-            base_url, token,
-            earliest_time="-15m",
-            latest_time="now",
-            output_dir="testing_dir")
-        if testing:
-            print("sukses")
-        else:
-            print("gagal coeg!")
+        query = ("""search `notable`
+                 | search (NOT `suppression` AND NOT status=5)""")
+        earliest_time = "-30m"
+        latest_time = "now"
+
+        sid = search.set_search_jobs(base_url, token, query,
+                                     earliest_time=earliest_time,
+                                     latest_time=latest_time
+                                     )
+        print(sid)
+        event_ids = search.get_search_results(base_url, token, sid,
+                                              earliest_time=earliest_time,
+                                              latest_time=latest_time)
+        print(event_ids)
+        event_id = [item['event_id'] for item in event_ids]
+        print(event_id)
+        try:
+            event = close_notable_event_by_sid(
+                base_url, token, sid)
+            logging.info(f"event: {event}")
+        except Exception as e:
+            logging.error(e)
 
     # Get full splunk instance info
     if (args.command == "splunk" and args.info):

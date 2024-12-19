@@ -4,3 +4,4 @@
 notable_chunks/
 testing_dir/
 __pycache__/
+*.egg-info/
