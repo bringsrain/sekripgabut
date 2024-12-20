@@ -1,21 +1,27 @@
 import logging
 import os
 import shutil
-from es_ops import es_api
-import splunk_helpers
-from utils.gabutils import (
+from sekripgabut.es_ops import es_api
+from sekripgabut.helpers import splunk_helpers
+from sekripgabut.utils.gabutils import (
     generate_weekly_ranges,
     write_to_json_file,
 )
 
 
-def find_first_notable_time(base_url, token):
+def find_first_notable_time(base_url, token,
+                            earliest_time="", latest_time="now"):
     query = "| tstats earliest(_time) AS _time WHERE index=notable"
     try:
         results = splunk_helpers.splunk_search(
             base_url, token, query,
-            earliest_time="",
-            latest_time="now")
+            earliest_time=earliest_time,
+            latest_time=latest_time,
+            )
+        if not results:
+            logging.warning(
+                "No results found for the first notable index time")
+            return None
         return results
     except Exception as e:
         logging.error(f"Failed to retrieve the first notable index time: {e}")

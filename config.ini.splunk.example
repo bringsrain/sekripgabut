@@ -1,0 +1,6 @@
+[Auth]
+token = place_your_token_here
+
+[Splunk]
+base_url = https://example.com:8089
+

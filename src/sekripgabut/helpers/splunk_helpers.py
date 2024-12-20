@@ -1,5 +1,5 @@
 import logging
-from splunk_ops import introspection, search
+from sekripgabut.splunk_ops import introspection, search
 import requests
 
 

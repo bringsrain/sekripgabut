@@ -29,13 +29,11 @@ def setup_logging(log_file="app.log", log_level=logging.INFO):
 
 
 def load_config(config_file, required_sections=None):
-    config = configparser.ConfigParser()
-    config.read(config_file)
-
     # Check if config file exists
     if not os.path.exists(config_file):
-        logging.error(f"Config file not found: {config_file}")
         raise FileNotFoundError(f"Config file not found: {config_file}")
+
+    config = configparser.ConfigParser()
 
     # Read the configuration file
     try:

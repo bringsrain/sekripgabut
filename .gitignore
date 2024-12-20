@@ -1,7 +1,9 @@
 *.ini
 *.json
 *.log
-notable_chunks/
 testing_dir/
 __pycache__/
 *.egg-info/
+.venv/
+*.BAK
+dist/
