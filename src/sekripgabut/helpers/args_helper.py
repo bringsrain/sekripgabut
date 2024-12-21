@@ -26,6 +26,13 @@ def add_es_arguments(parser):
         help="Find first notable index time",
     )
     parser.add_argument(
+        "--weekly-unclosed-notable",
+        action="store_true",
+        help=("""
+              Fetch un-closed notables in time range to file,
+              split them weekly""")
+    )
+    parser.add_argument(
         "--update-notable",
         help="Update notable event"
     )
@@ -40,6 +47,10 @@ def add_es_arguments(parser):
     parser.add_argument(
         "--latest",
         help="End time to search"
+    )
+    parser.add_argument(
+        "--path",
+        help="Output file or directory"
     )
 
 
@@ -103,6 +114,30 @@ def get_args(**kwargs):
     es_parser = subparsers.add_parser(
         "es",
         help="Collection of Splunk Enterprise Security operations"
+    )
+
+    # Pemutihan cuy
+    pemutihan_parser = subparsers.add_parser(
+        "pemutihan",
+        help="Bersih-bersih..."
+    )
+    pemutihan_parser.add_argument(
+        "--config",
+        required=True,
+        help="Load splunk config"
+    )
+    pemutihan_parser.add_argument(
+        "--path",
+        required=True,
+        help="Path to file that contains event_id"
+    )
+    pemutihan_parser.add_argument(
+        "--earliest",
+        help="Start time to search"
+    )
+    pemutihan_parser.add_argument(
+        "--latest",
+        help="End time to search"
     )
 
     # Add 'es' arguments

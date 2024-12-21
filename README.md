@@ -11,11 +11,11 @@
 4. Lagi libur dan ga ada oprekan lain.
 5. Gabut aja!
 
-Yaah, seenggaknya skrip ini bisa mengubah *"gabut"* menjadi **ga** *"gabut-gabut"* banget.
+Yaah, seenggaknya skrip ini bisa mengubah *"gabut"* jadi **ga** *"gabut-gabut"* banget.
 
 ## Visi
 
-Sapa tau kedepannya bisa menjadi **swiss army knife** buat daily operations. At least for myself. Nyiahiahiahiahiahia...
+Sapa tau kedepannya bisa jadi **swiss army knife** buat daily operations. At least for myself. Nyiahiahiahiahiahia...
 
 ## Udah Bisa Apa?
 
@@ -100,8 +100,31 @@ pip install .
     ```
     - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
     - `--first-notable-index`: Flag buat dapetin waktu pertama kali notable event diindeks dalam rentang waktu tertentu (Default: **All-time**).
-    - `--earliest`: Tentuin waktu awal *search*. (Optional. Default: `""`)
-    - `--latest`: Tentuin batas waktu akhir *search*. (Optional. Default: `now`)
+    - `--earliest`: Batas waktu awal pencarian. (Optional. Default: `""`). Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
+    - `--latest`: Batas waktu akhir pencarian. (Optional. Default: `""`). Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
+
+* *Fetch `event_id` notable event* yang belum di-*close* yang di-*split* per tujuh hari, kemudian disimpan ke dalam file JSON pada *output file* yang ditentukan.
+    ```
+    sekripgabut es --config fs.ini --weekly-unclosed-notable --path .\output-dir --earliest="-15m" --latest="now"
+    ```
+    - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
+    - `--weekly-unclosed-notable`: Flag buat *fetch `event_id` notable event* yang belum di-*close* dalam rentang waktu tertentu (Default: **All-time**).
+    - `--earliest`: Batas waktu awal pencarian. (Optional. Default: `""`). Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*. Jika opsi tidak digunakan maka waktu index pertama akan ditentukan dari output opsi `--first-notable-index`.
+    - `--latest`: Batas waktu akhir pencarian. (Optional. Default: `""`). Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*. Jika opsi tidak digunakan maka batas waktu akhir adalah `"now"`
+
+#### `sekripgabut pemutihan`
+
+* Tutup semua notable event dalam *range* waktu yang ditentukan.
+    > "Command ini dibuat dalam rangka menyambut tahun baru 2025"
+    ```
+    sekripgabut pemutihan --config D:\dev\sekripgabut\fs.ini --path fs-okt-2024 --earliest="2024-10-01T00:00:00" --latest="2024-11-01T00:00:00"
+    ```
+    **Seluruh opsi REQUIRED yak!**
+    - `pemutihan`: *Command* yang dipake khusus untuk menyambut tahun baru 2025.
+    - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
+    - `--path`: *Path* output direktori (folder) tempat JSON file berisi `event_id` akan disimpan. `event_id` merujuk pada notable event yang akan diputihkan.
+    - `--earlest`: Batas waktu awal pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
+    - `--latest`: Batas waktu akhir pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
 
 #### `sekripgabut --help`
 

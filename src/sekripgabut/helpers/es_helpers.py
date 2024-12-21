@@ -31,7 +31,7 @@ def find_first_notable_time(base_url, token,
 def fetch_unclosed_notable_to_file(
         base_url,
         token,
-        earliest_time="",
+        earliest_time=None,
         latest_time="now",
         output_dir="unclosed-notables"):
     """Get all un-closed notable events since the {earliest_time}

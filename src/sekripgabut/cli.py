@@ -11,6 +11,7 @@ from sekripgabut.helpers import (
     args_helper,
     es_helpers,
     splunk_helpers,
+    pemutihan,
 )
 
 
@@ -71,6 +72,27 @@ def main():
             else:
                 logging.error(
                     "Failed to retrieve the first notable index time")
+        elif args.weekly_unclosed_notable:
+            path = getattr(args, 'path', "unclosed-notables")
+            results = es_helpers.fetch_unclosed_notable_to_file(
+                base_url,
+                token,
+                earliest_time=earliest_time,
+                latest_time=latest_time,
+                output_dir=path
+            )
+
+            if results:
+                logging.info("Un-closed notable fetched")
+            else:
+                logging.critical("Failed to fetch notables")
+        else:
+            logging.error("Invalid 'es' subcommand argument(s)")
+
+    if args.command == "pemutihan":
+        earliest = getattr(args, 'earliest', None)
+        latest = getattr(args, 'latest', 'now')
+        pemutihan.pemutihan(base_url, token, args.path, earliest, latest)
 
 
 if __name__ == "__main__":
