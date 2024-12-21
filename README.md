@@ -11,11 +11,11 @@
 4. Lagi libur dan ga ada oprekan lain.
 5. Gabut aja!
 
-Yaah, seenggaknya skrip ini bisa mengubah *"gabut"* menjadi *"gabut-gabut"* banget.
+Yaah, seenggaknya skrip ini bisa mengubah *"gabut"* menjadi **ga** *"gabut-gabut"* banget.
 
 ## Visi
 
-Sapa tau kedepannya bisa menjadi swiss army knife buat daily operations. At least for myself. Nyiahiahiahiahiahia...
+Sapa tau kedepannya bisa menjadi **swiss army knife** buat daily operations. At least for myself. Nyiahiahiahiahiahia...
 
 ## Udah Bisa Apa?
 
@@ -42,7 +42,7 @@ git clone https://github.com/bringsrain/sekripgabut.git
 git clone https://gitlab.com/bringsrain/sekripgabut.git
 
 # nganu -- yang tau-tau aja
-git clone http://http://nganu:3000/usernamegw/sekripgabut.git
+git clone http://nganu:3000/usernamegw/sekripgabut.git
 
 cd sekripgabut
 pip install .
@@ -58,6 +58,9 @@ conda create -n sekripgabut python=3.9
 
 # Aktifin virtual environment
 conda activate sekripgabut
+
+# Install dependensi
+pip install .
 ```
 
 ### Python Venv
@@ -82,7 +85,7 @@ pip install .
 
 ### Command-Line Interace(CLI)
 
-`sekripgabut` itu jalan di-*command-line* atau di terminal (bukan pulogadung atau rambutan yak) emulator.
+`sekripgabut` itu jalan di-*command-line* atau di terminal (bukan pulogadung atau rambutan yak) *emulator*.
 
 ### Available Commands
 
