@@ -19,7 +19,7 @@ CONFIG_FILE = "config.ini"
 
 
 def main():
-    setup_logging(log_file="sekripgabut.log", log_level=logging.DEBUG)
+    setup_logging(log_file="sekripgabut.log", log_level=logging.INFO)
     args = args_helper.get_args(prog="sekripgabut")
 
     # Load configuration file
