@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sekripgabut",
-    version="0.4.1",
+    version="0.4.2",
     py_modules=["main"],
     packages=find_packages(where="src"),
     package_dir={"": "src"},
@@ -20,6 +20,7 @@ setup(
     },
     install_requires=[
         "requests>=2.32.3",
+        "jmespath>=1.0.1",
     ],
     entry_points={
         "console_scripts": [

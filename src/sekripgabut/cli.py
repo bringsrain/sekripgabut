@@ -2,7 +2,8 @@ import logging
 import configparser
 # import sys
 # import urllib3
-# import json
+import json
+from sekripgabut.splunk_ops.introspection import get_server_info, get_splunk_version
 from sekripgabut.utils.gabutils import (
     setup_logging,
     load_config,
@@ -88,6 +89,21 @@ def main():
                 logging.critical("Failed to fetch notables")
         else:
             logging.error("Invalid 'es' subcommand argument(s)")
+
+    if args.command == "splunk":
+        if args.info:
+            try:
+                splunk_info = get_server_info(base_url, token)
+                print(json.dumps(splunk_info, indent=4))
+            except Exception as e:
+                logging.error(f"Failed to get splunk instance info: {e}")
+
+        if args.version:
+            try:
+                version = get_splunk_version(base_url, token)
+                print(version)
+            except Exception as e:
+                logging.error(f"Unexpected error occurred: {e}")
 
     if args.command == "pemutihan":
         # Extract time range arguments

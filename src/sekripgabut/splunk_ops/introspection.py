@@ -1,4 +1,5 @@
 # import json
+import jmespath
 import requests
 import urllib3
 import logging
@@ -19,7 +20,7 @@ def get_server_info(base_url, token):
     token -- Splunk access token.
 
     Returns:
-    json -- Current splunk instance info. Otherwise None
+    dict -- JSON response from splunk server info. Otherwise None
     """
     endpoint = f"{base_url}{SERVER_INFO}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -54,9 +55,9 @@ def get_splunk_version(base_url, token):
     try:
         splunk_info = get_server_info(base_url, token)
         if splunk_info:
-            splunk_version = splunk_info["entry"][0]["content"]["version"]
+            expression = "entry[0].content.version"
+            splunk_version = jmespath.search(expression, splunk_info)
             return splunk_version
     except Exception as e:
         logging.error(f"Failed to retrieve splunk info: {e}")
-
     return None

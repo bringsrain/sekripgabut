@@ -66,6 +66,10 @@ def add_splunk_arguments(parser):
         help="Return splunk instance version",
         action="store_true"
     )
+    parser.add_argument(
+        "--config",
+        help="Load Splunk config.ini file"
+    )
 
 
 def add_search_arguments(parser):
@@ -97,6 +101,28 @@ def add_search_arguments(parser):
     )
 
 
+def add_pemutihan_arguments(parser):
+    """Add arguments for 'pemutihan' command"""
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Load splunk config"
+    )
+    parser.add_argument(
+        "--path",
+        required=True,
+        help="Path to file that contains event_id"
+    )
+    parser.add_argument(
+        "--earliest",
+        help="Start time to search"
+    )
+    parser.add_argument(
+        "--latest",
+        help="End time to search"
+    )
+
+
 def get_args(**kwargs):
     """Build the arguments parsers"""
     parser = argparse.ArgumentParser(
@@ -121,32 +147,18 @@ def get_args(**kwargs):
         "pemutihan",
         help="Bersih-bersih..."
     )
-    pemutihan_parser.add_argument(
-        "--config",
-        required=True,
-        help="Load splunk config"
-    )
-    pemutihan_parser.add_argument(
-        "--path",
-        required=True,
-        help="Path to file that contains event_id"
-    )
-    pemutihan_parser.add_argument(
-        "--earliest",
-        help="Start time to search"
-    )
-    pemutihan_parser.add_argument(
-        "--latest",
-        help="End time to search"
-    )
-
-    # Add 'es' arguments
-    add_es_arguments(es_parser)
 
     splunk_parser = subparsers.add_parser(
         "splunk",
         help="Collection of Splunk Enterprise operations"
     )
+
+    # Add 'es' arguments
+    add_es_arguments(es_parser)
+
+    # Add 'pemutihan' arguments
+    add_pemutihan_arguments(pemutihan_parser)
+
     # Add 'splunk' arguments
     add_splunk_arguments(splunk_parser)
 
