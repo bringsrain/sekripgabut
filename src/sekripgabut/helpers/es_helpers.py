@@ -116,9 +116,33 @@ def fetch_unclosed_notable_to_file(
 
 
 def close_notable_event_by_event_id(base_url, token, event_id, **kwargs):
-    results = es_api.update_notable_event(base_url, token, status=5,
-                                          ruleUIDs=event_id, **kwargs)
-    return results
+    """
+    Close notable events by their event IDs.
+
+    Arguments:
+        base_url -- Splunk instance base URL.
+        token -- Splunk token access.
+        event_id -- List of event IDs to be closed.
+
+    Keyword arguments:
+        kwargs -- Additional arguments for updating notable events.
+
+    Returns:
+        dict -- JSON response from the API.
+    """
+    if not event_id:
+        raise ValueError("Event ID(s) required to close notable events.")
+
+    logging.debug(f"Closing notable events for event IDs: {event_id}")
+
+    try:
+        results = es_api.update_notable_event(
+            base_url, token, status=5, ruleUIDs=event_id, **kwargs
+        )
+        return results
+    except Exception as e:
+        logging.error(f"Failed to close notable event: {e}")
+        raise
 
 
 def close_notable_event_by_sid(base_url, token, sid, **kwargs):

@@ -1,8 +1,8 @@
 import logging
 import configparser
-import sys
-import urllib3
-import json
+# import sys
+# import urllib3
+# import json
 from sekripgabut.utils.gabutils import (
     setup_logging,
     load_config,
@@ -10,7 +10,7 @@ from sekripgabut.utils.gabutils import (
 from sekripgabut.helpers import (
     args_helper,
     es_helpers,
-    splunk_helpers,
+    # splunk_helpers,
     pemutihan,
 )
 
@@ -90,9 +90,27 @@ def main():
             logging.error("Invalid 'es' subcommand argument(s)")
 
     if args.command == "pemutihan":
+        # Extract time range arguments
         earliest = getattr(args, 'earliest', None)
         latest = getattr(args, 'latest', 'now')
-        pemutihan.pemutihan(base_url, token, args.path, earliest, latest)
+
+        # Validate an log arguments
+        if not args.path:
+            logging.error("Path is required for the 'pemutihan' command.")
+            return
+
+        if not earliest:
+            logging.warning(
+                "No 'earliest' time provided; using default (None).")
+
+        if latest == 'now':
+            logging.info("'latest' time not provided; using default ('now').")
+
+        # Call the pemutihan function
+        try:
+            pemutihan.pemutihan(base_url, token, args.path, earliest, latest)
+        except Exception as e:
+            logging.critical(f"Failed to execute 'pemutihan': {e}")
 
 
 if __name__ == "__main__":

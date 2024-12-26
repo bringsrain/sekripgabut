@@ -20,53 +20,51 @@ def update_notable_event(base_url, token, status=None, ruleUIDs=[],
     token -- Splunk token access.
 
     Keyword arguments:
-    ruleUIDs -- A list of finding IDs. Must be provided if a searchID is not
-    provided. Include multiples of this attribute to edit multiple events.
-    searchID -- An ID of a search. All of the events associated with this
-    search will be modified unless a list of ruleUIDs are provided that limit
-    the scope to a subset of the results.
-    newOwner -- An owner. Only required if reassigning the event.
-    urgency -- An urgency. Only required if you are changing the urgency of
-    the event.
-    status -- A status ID matching a status in reviewstatuses.conf. Only
-    required if you are changing the status of the event.
-    disposition -- An ID for a disposition that matches a disposition in the
-    reviewstatuses.conf configuration file. Required only if you are changing
-    the disposition of the event.
-    comment -- A description of the change or some information about the
-    findings.
+    ruleUIDs -- A list of finding IDs. Required if `searchID` is not provided.
+    searchID -- ID of a search. Required if `ruleUIDs` is not provided.
+    newOwner -- New owner for the notable events.
+    urgency -- New urgency (severity) for the notable events.
+    status -- New status ID for the notable events.
+    disposition -- New disposition ID for the notable events.
+    comment -- Additional comment about the changes.
 
     Returns:
-    json - Response text values
+    dict - JSON response from the API.
     """
+    if not (ruleUIDs or searchID):
+        raise ValueError("Either 'ruleUIDs' or 'searchID' must be provided")
+
     endpoint = f"{base_url}{NOTABLE_UPDATE}"
     headers = {"Authorization": f"Bearer {token}"}
     data = {
-        "newOwner": newOwner,
-        "urgency": urgency,
-        "status": status,
-        "disposition": disposition,
-        "comment": comment,
+        key: value for key, value in {
+            "ruleUIDs": ruleUIDs,
+            "searchID": searchID,
+            "newOwner": newOwner,
+            "urgency": urgency,
+            "status": status,
+            "disposition": disposition,
+            "comment": comment,
+        }.items() if value  # Include only non-empty values
     }
-    if searchID:
-        data.update({'searchID': searchID})
-    if ruleUIDs:
-        data.update({"ruleUIDs": ruleUIDs})
 
     try:
         logging.info("Start to update events")
         response = requests.post(endpoint, headers=headers, data=data,
                                  verify=False)
-        logging.info(response.status_code)
-        if response.status_code != 200:
-            raise Exception(
-                logging.error(
-                    f"Failed to update {ruleUIDs if ruleUIDs else searchID}"
-                    f"{response.json()}"
+
+        # Check response status and log details
+        if response.status_code == 200:
+            logging.info(f"Successfully update events: {response.json()}")
+        else:
+            error_details = response.json()
+            logging.error(
+                f"Failed to update events ({ruleUIDs or searchID}):"
+                f"{error_details}"
                 )
-            )
-        logging.info(response.text)
-        return response.json()
+        # Raise HTTPError for non-200 status codes
+        response.raise_for_status()
+
     except Exception as e:
         logging.critical(f"Failed to update event: {e}")
         raise
