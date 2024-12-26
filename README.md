@@ -81,6 +81,25 @@ python
 # Install dependensi
 pip install .
 ```
+## Related Files
+
+### Splunk Configuration File (`config.ini` or `[any].ini`)
+
+Contoh file config.ini
+
+Saat ini baru untuk Splunk
+```
+[Auth]
+token = place_your_token_here
+
+[Splunk]
+base_url = https://example.com:8089
+
+```
+
+### Log File
+
+`sekrigabut.log` akan tersimpan di-*path* yang sama saat eksekusi `sekripgabut`
 ## Cara Pake
 
 ### Command-Line Interace(CLI)

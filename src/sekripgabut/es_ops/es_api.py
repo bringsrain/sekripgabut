@@ -1,5 +1,5 @@
 import requests
-# import json
+import json
 import urllib3
 import logging
 
@@ -49,22 +49,37 @@ def update_notable_event(base_url, token, status=None, ruleUIDs=[],
     }
 
     try:
-        logging.info("Start to update events")
+        logging.info("Startng to update events...")
+
+        # Send the API request
         response = requests.post(endpoint, headers=headers, data=data,
                                  verify=False)
 
-        # Check response status and log details
-        if response.status_code == 200:
-            logging.info(f"Successfully update events: {response.json()}")
-        else:
-            error_details = response.json()
-            logging.error(
-                f"Failed to update events ({ruleUIDs or searchID}):"
-                f"{error_details}"
-                )
-        # Raise HTTPError for non-200 status codes
-        response.raise_for_status()
+        # Parse and log response details
+        try:
+            response_data = response.json()
+            logging.debug(f"Response JSON: {response_data}")
+        except json.JSONDecodeError:
+            logging.error("Failed to decode JSON from response")
+            response.raise_for_status()
+            raise
 
+        # Check if the API reported success
+        if response.status_code == 200 and response_data.get("success", False):
+            logging.info(f"Successfully update events: {response_data}")
+            return response_data
+        else:
+            error_message = response_data.get(
+                "message", "Unknown error occurred")
+            logging.error(
+                # f"Failed to update events ({ruleUIDs or searchID}):"
+                f"Error: {error_message}. {len(ruleUIDs) if ruleUIDs else ''}"
+                )
+            raise ValueError(f"Update failed: {error_message}")
+
+    except requests.exceptions.RequestException as e:
+        logging.critical(f"Request failed: {e}")
+        raise
     except Exception as e:
-        logging.critical(f"Failed to update event: {e}")
+        logging.critical(f"Unexpected error occurred: {e}")
         raise

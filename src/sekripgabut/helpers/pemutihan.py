@@ -47,22 +47,35 @@ def pemutihan(base_url, token, path, earliest_time, latest_time):
             event_ids = _read_event_ids_from_directory(path)
 
         # Extract event_id
-        event_id = [
+        event_ids = [
             item['event_id'] for item in event_ids if 'event_id' in item
         ]
 
-        if not event_id:
+        if not event_ids:
             logging.warning("No valid event IDs found in the input.")
             return
 
-        # Close notable events
-        logging.info(f"Closing {len(event_id)} notable event...")
-        results = es_helpers.close_notable_event_by_event_id(
-            base_url,
-            token,
-            event_id
-        )
-        logging.info(f"Successfully closed events: {results}")
+        # Close notable events per batch
+        batch_size = 8000
+        for i in range(0, len(event_ids), batch_size):
+            batch = event_ids[i:i + batch_size]
+            logging.info(
+                f"processing batch {i // batch_size + 1}:"
+                f"{len(batch)} notable events..."
+            )
+            try:
+                results = es_helpers.close_notable_event_by_event_id(
+                    base_url,
+                    token,
+                    batch,
+                )
+                logging.info(
+                    f":Batch {i // batch_size + 1} from: {len(event_ids)}"
+                    f"results: {results}")
+            except Exception as e:
+                logging.error(
+                    f"Error processing batch {i // batch_size + 1}"
+                    f"from {len(event_ids)}: {e}")
     except Exception as e:
         logging.error(f"An error occurred during event processing: {e}")
 

@@ -139,7 +139,10 @@ def close_notable_event_by_event_id(base_url, token, event_id, **kwargs):
         results = es_api.update_notable_event(
             base_url, token, status=5, ruleUIDs=event_id, **kwargs
         )
+        logging.info(f"Update results: {results}")
         return results
+    except ValueError as e:
+        logging.warning(f"Splunk API error: {e}")
     except Exception as e:
         logging.error(f"Failed to close notable event: {e}")
         raise
