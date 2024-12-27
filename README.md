@@ -47,10 +47,28 @@ git clone http://nganu:3000/usernamegw/sekripgabut.git
 cd sekripgabut
 pip install .
 ```
+### Upgrade Versi
+```
+# Masuk ke existing directory
+cd sekripgabut
+
+# git clone or git pull for existing directory
+# github
+git pull https://github.com/bringsrain/sekripgabut.git
+
+# gitlab
+git pull https://gitlab.com/bringsrain/sekripgabut.git
+
+# nganu -- yang tau-tau aja
+git pull http://nganu:3000/usernamegw/sekripgabut.git
+
+# Upgrade menggunakan pip
+pip install --upgrade .
+```
 
 ### Setup Virtual Environment (Optional)
 
-### Anaconda/Miniconda
+#### Anaconda/Miniconda
 
 ```
 # Bikin virtual environment
@@ -63,7 +81,7 @@ conda activate sekripgabut
 pip install .
 ```
 
-### Python Venv
+#### Python Venv
 
 ```
 # Bikin virtual environment
