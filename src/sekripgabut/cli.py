@@ -3,7 +3,10 @@ import configparser
 # import sys
 # import urllib3
 import json
-from sekripgabut.splunk_ops.introspection import get_server_info, get_splunk_version
+from sekripgabut.splunk_ops.introspection import (
+    get_server_info,
+    get_splunk_version,
+)
 from sekripgabut.utils.gabutils import (
     setup_logging,
     load_config,
@@ -20,7 +23,7 @@ CONFIG_FILE = "config.ini"
 
 
 def main():
-    setup_logging(log_file="sekripgabut.log", log_level=logging.INFO)
+    setup_logging(log_file="sekripgabut.log", log_level=logging.DEBUG)
     args = args_helper.get_args(prog="sekripgabut")
 
     # Load configuration file
@@ -106,27 +109,56 @@ def main():
                 logging.error(f"Unexpected error occurred: {e}")
 
     if args.command == "pemutihan":
-        # Extract time range arguments
-        earliest = getattr(args, 'earliest', None)
-        latest = getattr(args, 'latest', 'now')
+        if args.ver == "v2":
+            # Extract time range arguments
+            earliest = getattr(args, 'earliest', None)
+            latest = getattr(args, 'latest', 'now')
 
-        # Validate an log arguments
-        if not args.path:
-            logging.error("Path is required for the 'pemutihan' command.")
-            return
+            # Validate log arguments
+            if not earliest:
+                logging.warning(
+                    "No 'earliest' provided; using default (None)."
+                )
 
-        if not earliest:
-            logging.warning(
-                "No 'earliest' time provided; using default (None).")
+            if latest == 'now':
+                logging.info(
+                    "No 'latest' time provided; using default ('now')."
+                )
 
-        if latest == 'now':
-            logging.info("'latest' time not provided; using default ('now').")
+            # Call pemutihan v2 function
+            try:
+                pemutihan.pemutihan_v2(
+                    base_url, token, earliest, latest
+                )
+            except Exception as e:
+                logging.critical(f"Failed to execute 'pemutihan_v2': {e}")
 
-        # Call the pemutihan function
-        try:
-            pemutihan.pemutihan(base_url, token, args.path, earliest, latest)
-        except Exception as e:
-            logging.critical(f"Failed to execute 'pemutihan': {e}")
+        elif args.ver is None:
+            # Extract time range arguments
+            earliest = getattr(args, 'earliest', None)
+            latest = getattr(args, 'latest', 'now')
+
+            # Validate an log arguments
+            if not args.path:
+                logging.error("Path is required for the 'pemutihan' command.")
+                return
+
+            if not earliest:
+                logging.warning(
+                    "No 'earliest' time provided; using default (None).")
+
+            if latest == 'now':
+                logging.info(
+                    "'latest' time not provided; using default ('now').")
+
+            # Call the pemutihan function
+            try:
+                pemutihan.pemutihan(
+                    base_url, token, args.path, earliest, latest)
+            except Exception as e:
+                logging.critical(f"Failed to execute 'pemutihan': {e}")
+        else:
+            print(f"Error: unknown version '{args.ver}'")
 
 
 if __name__ == "__main__":

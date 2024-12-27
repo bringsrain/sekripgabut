@@ -11,18 +11,40 @@ from sekripgabut.utils.gabutils import (
 
 def find_first_notable_time(base_url, token,
                             earliest_time="", latest_time="now"):
+    """
+    Find the earliest notable event time in Splunk `notable` index.
+
+    Arguments:
+        base_url (str): Base URL of the Splunk instance.
+        token (str): Splunk access token.
+        earliest_time (str, optional): Start time to search.
+        latest_time (str, optional): End time to search.
+
+    Returns:
+        dict: The earliest notable event time result, or None if no result.
+    """
     query = "| tstats earliest(_time) AS _time WHERE index=notable"
     try:
+        logging.info("Executing search for earliest notable event index time.")
         results = splunk_helpers.splunk_search(
-            base_url, token, query,
+            base_url=base_url,
+            token=token,
+            query=query,
             earliest_time=earliest_time,
             latest_time=latest_time,
             )
+
         if not results:
             logging.warning(
-                "No results found for the first notable index time")
+                "No notable event times found within the specified range.")
             return None
-        return results
+
+        earliest_result = (
+            results[0] if isinstance(results, list) and results else results
+        )
+        logging.info(f"Earliest notable event retrieved: {earliest_result}")
+        return earliest_result
+
     except Exception as e:
         logging.error(f"Failed to retrieve the first notable index time: {e}")
         return None
@@ -149,6 +171,34 @@ def close_notable_event_by_event_id(base_url, token, event_id, **kwargs):
 
 
 def close_notable_event_by_sid(base_url, token, sid, **kwargs):
-    results = es_api.update_notable_event(base_url, token, status=5,
-                                          searchID=sid, **kwargs)
-    return results
+    """
+    Close notable events by their search IDs.
+
+    Arguments:
+        base_url -- Splunk instance base URL.
+        token -- Splunk token access.
+        sid -- Search IDs to be closed.
+
+    Keyword arguments:
+        kwargs -- Additional arguments for updating notable events.
+
+    Returns:
+        dict -- JSON response from the API.
+    """
+    if not sid:
+        raise ValueError("Search ID(s) required to close notable events.")
+    try:
+        results = es_api.update_notable_event(
+            base_url,
+            token,
+            status=5,
+            searchID=sid,
+            **kwargs
+        )
+        logging.info(f"Update results: {results}")
+        return results
+    except ValueError as e:
+        logging.warning(f"Splunk API error: {e}")
+    except Exception as e:
+        logging.error(f"Failed to close notable event: {e}")
+        raise

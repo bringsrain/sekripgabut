@@ -1,8 +1,14 @@
 import os
 import json
 import logging
+
+import jmespath
 # import search
 from sekripgabut.helpers import es_helpers
+from sekripgabut.splunk_ops.search import (
+    set_search_jobs,
+    get_search_results,
+)
 
 
 def pemutihan(base_url, token, path, earliest_time, latest_time):
@@ -18,7 +24,6 @@ def pemutihan(base_url, token, path, earliest_time, latest_time):
         earliest_time -- Start of the time range for fetching events.
         latest_time -- End of the time range for fetching events.
     """
-
     try:
         # Fetch unclosed notable events and save to files
         logging.info("Fetching unclosed notable events...")
@@ -78,6 +83,94 @@ def pemutihan(base_url, token, path, earliest_time, latest_time):
                     f"from {len(event_ids)}: {e}")
     except Exception as e:
         logging.error(f"An error occurred during event processing: {e}")
+
+
+def pemutihan_v2(base_url, token, earliest_time, latest_time):
+    """
+    Process and close notable events in a specified time range.
+
+    Arguments:
+        base_url (str): Base URL of the Splunk instance.
+        token (str): Bearer token for authentication.
+        earliest_time (str): Start time for processing notable events.
+        latest_time (str): End time for processing notable events.
+    """
+    # Determine the time if not provided
+    if not earliest_time:
+        first_notable = es_helpers.find_first_notable_time(base_url, token)
+        if (first_notable and isinstance(first_notable, list) and
+                len(first_notable) > 0):
+            earliest_time = first_notable[0].get("_time")
+            logging.info(f"Derived earliest_time: {earliest_time}")
+
+    query = """
+    search `notable` | search (NOT `suppression` AND NOT status=5)
+    """
+    total_results = 0
+
+    try:
+        # Start the searach job
+        logging.info("Starting search jobs...")
+        sid = set_search_jobs(
+            base_url=base_url,
+            token=token,
+            query=query,
+            earliest_time=earliest_time,
+            latest_time=latest_time,
+            adhoc_search_level="smart",
+            exec_mode="blocking",
+        )
+        logging.info(f"Search job started with search ID: {sid}")
+
+        # Fetch search results
+        results = get_search_results(base_url, token, sid)
+        total_results = len(results)
+        logging.info(f"Total notable events found: {total_results}")
+
+    except Exception as e:
+        logging.error(f"Error starting search or fetching results: {e}")
+        return
+
+    if not total_results:
+        logging.info("No notable event found in the specified range.")
+        return
+
+    closed_count = 0
+    try:
+        while closed_count < total_results:
+            logging.info(f"Closing notable events for SID: {sid}")
+            update_results = es_helpers.close_notable_event_by_sid(
+                base_url, token, sid)
+
+            # Process the response
+            success = jmespath.search("success", update_results)
+            if success:
+                success_count = jmespath.search(
+                    "success_count", update_results)
+                failure_count = jmespath.search(
+                    "failure_count", update_results)
+                message = (jmespath.search("message", update_results) or
+                           ("No details available."))
+
+                closed_count += success_count
+                if failure_count:
+                    logging.warning(
+                        f"Failed to close: {failure_count} notable events."
+                        f"Message: {message}"
+                    )
+                    break
+                logging.info(
+                    f"Successfully closed {success_count} notable events."
+                    f"Total closed: {closed_count}"
+                )
+            else:
+                logging.error(f"Failed to close notable events."
+                              f"Response: {update_results}")
+                break
+    except Exception as e:
+        logging.error(f"Error closing notable events: {e}")
+
+    logging.info(f"Closed notable event: {closed_count}")
 
 
 def _read_event_ids_from_file(file_path):

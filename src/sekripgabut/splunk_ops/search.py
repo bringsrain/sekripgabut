@@ -54,16 +54,16 @@ def set_search_jobs(base_url, token, query,
                     earliest_time="-24h", latest_time="now",
                     output_mode="json", **kwargs):
     """Start a new search and return the search ID (<sid>)
-       Args:
-            base_url (str): Base URL of the Splunk instance.
-            token (str): Bearer token for authentication.
-            query (str): The search query.
-            earliest_time (str, optional): Earliest time for the search.
-            latest_time (str, optional): Latest time for the search.
-            output_mode (str, optional): Output format. Default is "json".
-            **kwargs: Additional parameters for the search.
-        Returns:
-        str: The search ID (sid) if the request is successful.
+    Args:
+         base_url (str): Base URL of the Splunk instance.
+         token (str): Splunk access token.
+         query (str): The search query.
+         earliest_time (str, optional): Earliest time for the search.
+         latest_time (str, optional): Latest time for the search.
+         output_mode (str, optional): Output format. Default is "json".
+         **kwargs: Additional parameters for the search.
+    Returns:
+    str: The search ID (sid) if the request is successful.
 
     Raises:
         Exception: If the request fails, logs the error and raises an
@@ -71,27 +71,44 @@ def set_search_jobs(base_url, token, query,
     """
     endpoint = f"{base_url}{SEARCH_JOBS}"
     headers = {"Authorization": f"Bearer {token}"}
-    data = {
-        "search": query,
-        "earliest_time": earliest_time,
-        "latest_time": latest_time,
-        "output_mode": output_mode,
-        **kwargs
+    payload = {
+        key: value for key, value in {
+            "search": query,
+            "earliest_time": earliest_time,
+            "latest_time": latest_time,
+            "output_mode": output_mode,
+            **kwargs
+        }.items() if value  # Include only non-empty values
     }
 
     response = None
 
     try:
+        logging.info("Initiating search jobs...")
         response = requests.post(endpoint, headers=headers,
-                                 data=data, verify=False)
+                                 data=payload, verify=False)
         response.raise_for_status()
-        return response.json().get("sid")
-    except requests.exceptions.RequestException as e:
-        if response:
+
+        # Validate the response JSON and extract 'sid'
+        response_json = response.json()
+        sid = response_json.get('sid')
+        if not sid:
             logging.error(
-                f"Response status: {response.status_code}"
-                f"Response text {response.text}")
-        logging.error(f"Request failed: {e}")
+                f"Search job initiated but no SID returned: {response_json}")
+            raise ValueError(
+                "Failed to retrieve search ID (sid) from the response."
+            )
+
+        logging.info(f"Search job created successfully wit SID: {sid}")
+        return sid
+    except requests.exceptions.RequestException as e:
+        error_message = f"Request to {endpoint} failed: {e}"
+        if response:
+            error_message += (
+                f" | Status Code: {response.status_code}"
+                f" | Response Text: {response.text}"
+            )
+        logging.error(error_message)
         raise
 
 
@@ -141,7 +158,7 @@ def get_search_results(base_url, token, sid, **kwargs):
 
         if response.status_code == 204:
             # No result yet; wait for the job to complete
-            time.sleep(5)
+            time.sleep(3)
             continue
 
         if response.status_code not in (200, 201):

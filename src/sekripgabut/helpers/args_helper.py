@@ -104,13 +104,19 @@ def add_search_arguments(parser):
 def add_pemutihan_arguments(parser):
     """Add arguments for 'pemutihan' command"""
     parser.add_argument(
+        "ver",
+        nargs="?",
+        help="Optional pemutihan v2"
+
+    )
+    parser.add_argument(
         "--config",
         required=True,
         help="Load splunk config"
     )
     parser.add_argument(
         "--path",
-        required=True,
+        required=False,
         help="Path to file that contains event_id"
     )
     parser.add_argument(
