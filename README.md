@@ -124,7 +124,7 @@ base_url = https://example.com:8089
 
 * *Fetch `event_id` notable event* yang belum di-*close* yang di-*split* per tujuh hari, kemudian disimpan ke dalam file JSON pada *output file* yang ditentukan.
     ```
-    sekripgabut es --config fs.ini --weekly-unclosed-notable --path .\output-dir --earliest="-15m" --latest="now"
+    sekripgabut es --config config.ini --weekly-unclosed-notable --path .\output-dir --earliest="-15m" --latest="now"
     ```
     - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
     - `--weekly-unclosed-notable`: Flag buat *fetch `event_id` notable event* yang belum di-*close* dalam rentang waktu tertentu (Default: **All-time**).
@@ -136,12 +136,25 @@ base_url = https://example.com:8089
 * Tutup semua notable event dalam *range* waktu yang ditentukan.
     > "Command ini dibuat dalam rangka menyambut tahun baru 2025"
     ```
-    sekripgabut pemutihan --config D:\dev\sekripgabut\fs.ini --path fs-okt-2024 --earliest="2024-10-01T00:00:00" --latest="2024-11-01T00:00:00"
+    sekripgabut pemutihan --config config.ini --path fs-okt-2024 --earliest="2024-10-01T00:00:00" --latest="2024-11-01T00:00:00"
     ```
     **Seluruh opsi REQUIRED yak!**
     - `pemutihan`: *Command* yang dipake khusus untuk menyambut tahun baru 2025.
     - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
     - `--path`: *Path* output direktori (folder) tempat JSON file berisi `event_id` akan disimpan. `event_id` merujuk pada notable event yang akan diputihkan.
+    - `--earlest`: Batas waktu awal pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
+    - `--latest`: Batas waktu akhir pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
+
+#### `sekripgabut pemutihan v2`
+
+* Tutup semua notable event dalam *range* waktu yang ditentukan versi **Lebih Ngacir** atau mungkin **Lebih Ganteng**.
+    > "Command ini dibuat dalam rangka menyambut tahun baru 2025"
+    ```
+    sekripgabut pemutihan v2 --config config.ini --earliest="2021-01-01T00:00:00" --latest="2024-11-01T00:00:00"
+    ```
+    - `pemutihan`: *Command* yang dipake khusus untuk menyambut tahun baru 2025.
+    - `v2`: *Positional argument* `ver`. Untuk menjalankan sekrip `pemutihan_v2`.
+    - `--config`: *Path* ke file konfigurasi (optional. Default: `config.ini`)
     - `--earlest`: Batas waktu awal pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
     - `--latest`: Batas waktu akhir pencarian. Format bisa menggunakan *time modifier* Splunk, baik *fixed* atau *relative time*.
 
