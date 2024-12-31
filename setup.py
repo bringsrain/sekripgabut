@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sekripgabut",
-    version="0.5.0",
+    version="0.6.0",
     py_modules=["main"],
     packages=find_packages(where="src"),
     package_dir={"": "src"},

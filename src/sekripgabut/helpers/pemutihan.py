@@ -1,13 +1,20 @@
 import os
 import json
 import logging
+from time import sleep
 
 import jmespath
+import requests
 # import search
 from sekripgabut.helpers import es_helpers
 from sekripgabut.splunk_ops.search import (
+    get_search_job_by_sid,
     set_search_jobs,
     get_search_results,
+)
+from sekripgabut.utils.gabutils import (
+    generate_daily_ranges,
+    generate_weekly_ranges
 )
 
 
@@ -85,7 +92,13 @@ def pemutihan(base_url, token, path, earliest_time, latest_time):
         logging.error(f"An error occurred during event processing: {e}")
 
 
-def pemutihan_v2(base_url, token, earliest_time, latest_time):
+def pemutihan_v2(
+        base_url,
+        token,
+        earliest_time,
+        latest_time,
+        offset=0,
+        batch_size=3000):
     """
     Process and close notable events in a specified time range.
 
@@ -95,82 +108,236 @@ def pemutihan_v2(base_url, token, earliest_time, latest_time):
         earliest_time (str): Start time for processing notable events.
         latest_time (str): End time for processing notable events.
     """
-    # Determine the time if not provided
-    if not earliest_time:
+    # TODO:
+    # - Check status. dispatchState, isDone?
+    # - Find valid results count. eventAvailableCount, eventCount, resultCount,
+    #   scanCount
+    # - Compare final closed result (offset accumulated) with the real results
+    #   count
+    # - Repeat close notable events by event_id
+    #   while closed_notables < results count
+    # event_available_count = None
+    # result_count = None
+
+    if earliest_time:
+        start_date = earliest_time
+    else:
         first_notable = es_helpers.find_first_notable_time(base_url, token)
-        if (first_notable and isinstance(first_notable, list) and
-                len(first_notable) > 0):
-            earliest_time = first_notable[0].get("_time")
-            logging.info(f"Derived earliest_time: {earliest_time}")
+        if isinstance(first_notable, dict):
+            start_date = first_notable["_time"]
+        else:
+            logging.warning(
+                """ No notable event found on this instance.
+                or check your earliest time input.""")
+            return
+
+    dates = generate_daily_ranges(start_date, latest_time)
 
     query = """
-    search `notable` | search (NOT `suppression` AND NOT status=5)
+    search `notable`
+    | search (NOT `suppression` AND NOT status=5)
     """
-    total_results = 0
 
-    try:
-        # Start the searach job
-        logging.info("Starting search jobs...")
-        sid = set_search_jobs(
-            base_url=base_url,
-            token=token,
-            query=query,
-            earliest_time=earliest_time,
-            latest_time=latest_time,
-            adhoc_search_level="smart",
-            exec_mode="blocking",
-        )
-        logging.info(f"Search job started with search ID: {sid}")
+    for date in dates:
+        earliest_time = date["start"]
+        latest_time = date["end"]
 
-        # Fetch search results
-        results = get_search_results(base_url, token, sid)
-        total_results = len(results)
-        logging.info(f"Total notable events found: {total_results}")
+        dispatch_state = None
+        event_count = None
+        # For reports
+        successes_count = 0
+        success_count = 0
+        failures_count = 0
+        failure_count = 0
+        total_processed = 0
+        total_final_proccessed = 0
 
-    except Exception as e:
-        logging.error(f"Error starting search or fetching results: {e}")
-        return
+        while True:
+            # Determine the time if not provided
 
-    if not total_results:
-        logging.info("No notable event found in the specified range.")
-        return
+            logging.info(
+                f"'Pemutihan' will start from {earliest_time} "
+                f"till {latest_time}.")
 
-    closed_count = 0
-    try:
-        while closed_count < total_results:
-            logging.info(f"Closing notable events for SID: {sid}")
-            update_results = es_helpers.close_notable_event_by_sid(
-                base_url, token, sid)
-
-            # Process the response
-            success = jmespath.search("success", update_results)
-            if success:
-                success_count = jmespath.search(
-                    "success_count", update_results)
-                failure_count = jmespath.search(
-                    "failure_count", update_results)
-                message = (jmespath.search("message", update_results) or
-                           ("No details available."))
-
-                closed_count += success_count
-                if failure_count:
-                    logging.warning(
-                        f"Failed to close: {failure_count} notable events."
-                        f"Message: {message}"
-                    )
-                    break
-                logging.info(
-                    f"Successfully closed {success_count} notable events."
-                    f"Total closed: {closed_count}"
+            try:
+                # Start the search job
+                logging.debug("Starting search jobs...")
+                sid = set_search_jobs(
+                    base_url=base_url,
+                    token=token,
+                    query=query,
+                    earliest_time=earliest_time,
+                    latest_time=latest_time,
+                    adhoc_search_level="smart",
                 )
-            else:
-                logging.error(f"Failed to close notable events."
-                              f"Response: {update_results}")
-                break
-    except Exception as e:
-        logging.error(f"Error closing notable events: {e}")
+                logging.info(f"Jobs {sid} is Done.")
+            except Exception as e:
+                logging.error(f"Failed to set the search jobs: {e}")
+                return
 
-    logging.info(f"Closed notable event: {closed_count}")
+            # Wait for search jobs to complete
+            try:
+                while True:
+                    # Monitoring {sid} search job status isDone.
+                    job_info = get_search_job_by_sid(base_url, token, sid)
+
+                    is_done = jmespath.search(
+                        "entry[0].content.isDone", job_info)
+                    dispatch_state = jmespath.search(
+                        "entry[0].content.dispatchState", job_info)
+                    # event_available_count = jmespath.search(
+                    #     "entry[0].content.eventAvailableCount", job_info)
+                    event_count = jmespath.search(
+                        "entry[0].content.eventCount", job_info)
+                    # result_count = jmespath.search(
+                    #     "entry[0].content.resultCount", job_info)
+
+                    logging.info(
+                        f"Job status: dispatchState={dispatch_state},"
+                        f"eventCount={event_count}, isDone={is_done}"
+                    )
+
+                    if is_done:
+                        break
+
+                    sleep(3)
+
+            except Exception as e:
+                logging.error(f"Error while monitoring job {sid}: {e}")
+                return
+
+            if not event_count or event_count == 0:
+                logging.info("===============================================")
+                logging.info(f"Time range: {earliest_time} -- {latest_time}")
+                logging.info(f"Successfully closed: {successes_count}")
+                logging.info(f"Failed to close: {failures_count}")
+                logging.info(
+                    f"Total processed events: {total_final_proccessed}")
+                logging.info("===============================================")
+                break
+
+            # Fetch and update notable event
+            endpoint = f"{base_url}/services/search/jobs/{sid}/results"
+            headers = {"Authorization": f"Bearer {token}"}
+
+            while total_processed < event_count:
+                # Fetch search results
+                payload = {
+                    "output_mode": "json",
+                    "offset": offset,
+                    "count": batch_size,
+                }
+
+                # fetch the results
+                try:
+                    r = requests.get(
+                        endpoint,
+                        headers=headers, params=payload, verify=False)
+                    r.raise_for_status()
+
+                    results = r.json()
+
+                    event_ids = jmespath.search("results[*].event_id", results)
+
+                    # if not isinstance(event_ids, list):
+                    #     logging.error(
+                    #         f"Event IDs content: {event_ids}"
+                    #         f"Event IDs type: {type(event_ids)}"
+                    #     )
+                    #     return
+
+                    if not event_ids:
+                        results_message = jmespath.search("messages", results)
+                        if event_count > 0:
+                            print("======")
+                            print(json.dumps(results, indent=4))
+                            print("======")
+                            break
+                        logging.info(
+                            f"Event IDs not found:"
+                            f"{results_message}"
+                        )
+                        logging.info(
+                            "======================")
+                        logging.info(
+                            f"Time range: {earliest_time} -- {latest_time}")
+                        logging.info(f"Event Count: {event_count}")
+                        logging.info(f"Successfully closed: {success_count}")
+                        logging.info(f"Failed to close: {failure_count}")
+                        logging.info(
+                            f"Total processed events: {total_processed}")
+                        logging.info(
+                            "======================")
+                        break
+
+                    close_results = es_helpers.close_notable_event_by_event_id(
+                        base_url, token, event_ids)
+
+                    if isinstance(close_results, dict):
+                        message = jmespath.search("message", close_results)
+                        success_count = jmespath.search(
+                            "success_count", close_results
+                        )
+                        failure_count = jmespath.search(
+                            "failure_count", close_results
+                        )
+                        success = jmespath.search("success", close_results)
+                        details = jmespath.search("details", close_results)
+
+                        successes_count += success_count
+                        failures_count += failure_count
+                        total_processed += len(event_ids)
+                        logging.info(
+                            f"Success = {success},"
+                            f"Total processed = {total_processed}"
+                        )
+                        logging.info(
+                            f"Current processed notable = "
+                            f"{success_count}/{event_count}"
+                        )
+                        if failure_count:
+                            logging.info(f"Failures count = {failures_count}")
+                            logging.info(f"Success = {success}")
+                            logging.info(f"Message = {message}")
+                            logging.info(f"Details = {details}")
+                            return
+
+                        logging.debug("Batch update success!")
+                    else:
+                        logging.error(f"Failed processing {batch_size} batch.")
+                        break
+
+                    total_final_proccessed += total_processed
+                    offset += batch_size
+
+                except Exception as e:
+                    logging.error(
+                        f"Error processing batch starting at offset {offset}: "
+                        f"{e}")
+                    return
+
+            if total_processed < event_count:
+                logging.info("=================")
+                logging.info(
+                    f"""
+                    Rechecking for remaining notable events.
+                    Proccesed: {total_final_proccessed}
+                    Closed: {successes_count} successfully
+                    """
+                )
+                logging.info("=================")
+
+                total_processed = 0
+                offset = 0
+                continue
+            logging.info("===============================================")
+            logging.info(f"Time range: {earliest_time} -- {latest_time}")
+            logging.info(f"Successfully closed: {successes_count}")
+            logging.info(f"Failed to close: {failures_count}")
+            logging.info(
+                f"Total processed events: {total_final_proccessed}")
+            logging.info("===============================================")
+            break
 
 
 def _read_event_ids_from_file(file_path):

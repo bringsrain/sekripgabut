@@ -137,7 +137,45 @@ def parse_date(date_str):
     raise ValueError(f"Invalid date format: {date_str}")
 
 
-def generate_weekly_ranges(start_date_input, end_date_input):
+def generate_weekly_ranges(start_date, end_date):
+    """Generate weekly range from start_date to end_date"""
+    # Parse input dates into datetime objects
+    start_date = parse_date(start_date)
+    end_date = parse_date(end_date)
+
+    # Normalize both dates to remove fractional seconds
+    start_date = start_date.replace(microsecond=0)
+    end_date = end_date.replace(microsecond=0)
+
+    # Adjust end_date to midnight if it isn't already
+    if end_date.time() != datetime.min.time():
+        end_date = (
+            end_date.replace(hour=0, minute=0, second=0) + timedelta(days=1))
+
+    # Prepare weekly date ranges
+    date_ranges = []
+    current_start = start_date
+
+    while current_start < end_date:
+        current_end = current_start + timedelta(
+            days=6, hours=23, minutes=59, seconds=59
+        )
+        if current_end >= end_date:
+            current_end = end_date - timedelta(seconds=1)
+
+        # Append normalized dates to results
+        date_ranges.append({
+            "start": current_start.strftime("%Y-%m-%dT%H:%M:%S"),
+            "end": current_end.strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+
+        # Move to the next week's range
+        current_start = current_end + timedelta(seconds=1)
+
+    return date_ranges
+
+
+def generate_daily_ranges(start_date_input, end_date_input):
     """Generate weekly range from start_date to end_date"""
     # Parse input dates into datetime objects
     start_date = parse_date(start_date_input)
@@ -158,7 +196,7 @@ def generate_weekly_ranges(start_date_input, end_date_input):
 
     while current_start < end_date:
         current_end = current_start + timedelta(
-            days=6, hours=23, minutes=59, seconds=59
+            days=0, hours=23, minutes=59, seconds=59
         )
         if current_end >= end_date:
             current_end = end_date - timedelta(seconds=1)

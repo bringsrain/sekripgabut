@@ -49,7 +49,7 @@ def update_notable_event(base_url, token, status=None, ruleUIDs=[],
     }
 
     try:
-        logging.info("Startng to update events...")
+        logging.info("Starting to update events...")
 
         # Send the API request
         response = requests.post(endpoint, headers=headers, data=data,

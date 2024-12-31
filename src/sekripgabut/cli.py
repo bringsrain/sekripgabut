@@ -23,7 +23,7 @@ CONFIG_FILE = "config.ini"
 
 
 def main():
-    setup_logging(log_file="sekripgabut.log", log_level=logging.DEBUG)
+    setup_logging(log_file="sekripgabut.log", log_level=logging.INFO)
     args = args_helper.get_args(prog="sekripgabut")
 
     # Load configuration file
@@ -111,7 +111,7 @@ def main():
     if args.command == "pemutihan":
         if args.ver == "v2":
             # Extract time range arguments
-            earliest = getattr(args, 'earliest', None)
+            earliest = getattr(args, 'earliest', '')
             latest = getattr(args, 'latest', 'now')
 
             # Validate log arguments

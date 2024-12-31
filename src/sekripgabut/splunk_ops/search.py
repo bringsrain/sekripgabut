@@ -51,7 +51,7 @@ def get_search_jobs(base_url, token, output_mode="json", **kwargs):
 
 
 def set_search_jobs(base_url, token, query,
-                    earliest_time="-24h", latest_time="now",
+                    earliest_time="", latest_time="now",
                     output_mode="json", **kwargs):
     """Start a new search and return the search ID (<sid>)
     Args:
@@ -72,13 +72,11 @@ def set_search_jobs(base_url, token, query,
     endpoint = f"{base_url}{SEARCH_JOBS}"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
-        key: value for key, value in {
             "search": query,
             "earliest_time": earliest_time,
             "latest_time": latest_time,
             "output_mode": output_mode,
             **kwargs
-        }.items() if value  # Include only non-empty values
     }
 
     response = None
@@ -112,7 +110,7 @@ def set_search_jobs(base_url, token, query,
         raise
 
 
-def get_search_jobs_sid(base_url, token, sid, output_mode="json", **kwargs):
+def get_search_job_by_sid(base_url, token, sid, output_mode="json", **kwargs):
     """Manage the {search_id} search job."""
     endpoint = f"{base_url}{SEARCH_JOBS_SID.format(search_id=sid)}"
     headers = {"Authorization": f"Bearer {token}"}
@@ -123,17 +121,17 @@ def get_search_jobs_sid(base_url, token, sid, output_mode="json", **kwargs):
     if kwargs:
         params.update(kwargs)
 
-    response = requests.get(endpoint, headers=headers,
-                            params=params, verify=False)
+    try:
+        logging.info(f"Requesting job {sid} info...")
+        response = requests.get(endpoint, headers=headers,
+                                params=params, verify=False)
+        response.raise_for_status()
 
-    if response.status_code == 200:
-        results = response.json()
-        return results
-    else:
-        raise Exception(
-            f"Code: {response.status_code}"
-            f"Response: {response.text}"
-        )
+        response_json = response.json()
+        return response_json
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request to {endpoint} failed: {e}")
+        raise
 
 
 def get_search_results(base_url, token, sid, **kwargs):
@@ -186,3 +184,16 @@ def get_search_results(base_url, token, sid, **kwargs):
         params["offset"] += page_count  # get another page
 
     return all_results
+
+
+def search_jobs_sid_events(
+        base_url,
+        token,
+        sid,
+        output_mode="json",
+        **kwargs):
+    endpoint = f"{base_url}{SEARCH_JOBS_SID_EVENTS.format(sid)}"
+    headers = {"Authorization": f"{token}"}
+    params = {
+        "output_mode": "json"
+    }
